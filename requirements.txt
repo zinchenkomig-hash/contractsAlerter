@@ -1,0 +1,3 @@
+defilib~=1.4.12
+texttable~=1.6.4
+alertlib~=0.2.4

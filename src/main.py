@@ -1,11 +1,11 @@
 from defilib.APIClients.EtherscanClient import EtherscanClient
-import telegram
-from telegram import Bot
 from datetime import datetime, timedelta
 from texttable import Texttable
 import time
 import json
 from typing import List
+from alertlib.bot.bot import Bot
+from config import REPORT_BOT_TOKEN
 
 
 def get_transactions_since_ts(address: str, ts: int = 0, limit=20) -> list:
@@ -29,11 +29,6 @@ def get_transactions_since_ts(address: str, ts: int = 0, limit=20) -> list:
     return transactions[:last_transaction_index]
 
 
-def send_tg_data(data: str, tg_bot_token: str, tg_channel: str):
-    tg_bot = Bot(token=tg_bot_token)
-    tg_bot.sendMessage(chat_id=tg_channel, text=data, parse_mode=telegram.constants.PARSEMODE_MARKDOWN_V2)
-
-
 class Contract:
     def __init__(self, address: str, name: str):
         self.address = address
@@ -45,11 +40,11 @@ class ContractAlerter:
     def __init__(self,
                  contracts_list: List[Contract],
                  refresh_rate: int,
-                 tg_bot_token: str = '2135710412:AAFgSYnf9Zif1oGFObFY3Q-H45I96jbgsyA',
-                 tg_channel: str = '@contract_alerts',
-                 save_file: str = 'last_ts.json'
+                 tg_bot_token: str,
+                 tg_chat: str,
+                 save_file: str = '../last_ts.json'
                  ):
-        self.tg_channel = tg_channel
+        self.tg_chat = tg_chat
         self.tg_bot_token = tg_bot_token
         self.save_file = save_file
         self.contracts_list = contracts_list
@@ -67,6 +62,7 @@ class ContractAlerter:
         if not transactions:
             print(f'No new data for {contract.name}')
             return False
+        print(f'{len(transactions)} transactions for {contract.name}')
         columns = ['datetime', 'hash']
         data = []
         for transaction in transactions:
@@ -82,8 +78,9 @@ class ContractAlerter:
         message_str = f'*{contract.name}*\n' \
                       f'{columns_str}\n' \
                       f'{table.draw()}'
-        print(message_str)
-        send_tg_data(data=message_str, tg_bot_token=self.tg_bot_token, tg_channel=self.tg_channel)
+        # print(message_str)
+        tg_bot = Bot(token=self.tg_bot_token)
+        tg_bot.send_message(text=message_str, chat=self.tg_chat, parse_mode='MarkdownV2')
         return int(transactions[-1]['timeStamp'])
 
     def save_last_ts(self, last_ts_data: dict):
@@ -131,7 +128,8 @@ class ContractAlerter:
 
 if __name__ == '__main__':
     wild_credit_deployer = Contract(address='0xd7b3b50977a5947774bFC46B760c0871e4018e97', name='Wild Credit Deployer')
-    uniswap_token = Contract(address='0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', name='Uniswap Token')
-    deployer_contracts = [wild_credit_deployer, uniswap_token]
-    alerter = ContractAlerter(contracts_list=deployer_contracts, refresh_rate=60)
+    ichi_deployer = Contract(address='0x11111D16485aa71D2f2BfFBD294DCACbaE79c1d4', name='ICHI Deployer')
+    deployer_contracts = [wild_credit_deployer, ichi_deployer]
+    alerter = ContractAlerter(contracts_list=deployer_contracts, refresh_rate=3600,
+                              tg_bot_token=REPORT_BOT_TOKEN, tg_chat='-746739291')
     alerter.alert_transactions_for_contracts()
